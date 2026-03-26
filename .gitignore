@@ -1,0 +1,48 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite3
+
+# Deploy scripts (не коммитить)
+deploy.sh
+deploy.ps1
+backup.sh
+upload_files.ps1
+install_on_server.sh
+update_server.ps1
+
+# Windows
+$null
+*.bat
+start.bat
+
+# Keys
+*.key
+*.pem
+ключь яндекс.txt
+
+# Environment files
+.env
+.env.server
