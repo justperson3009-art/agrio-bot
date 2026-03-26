@@ -290,7 +290,9 @@ class AIAgroConsultant:
                     logger.error(f"Ошибка Ollama API: {result}")
                     return "Извините, произошла ошибка. Попробуйте позже."
 
-                answer = result.get("message", {}).get("content", "")
+                # Ollama возвращает ответ в формате {"response": "..."} для /api/generate
+                # или {"message": {"content": "..."}} для /api/chat
+                answer = result.get("response", "") or result.get("message", {}).get("content", "")
 
                 logger.info(f"Qwen локальный ответ: {answer[:500]}...")
                 logger.info(f"Длина ответа: {len(answer)} символов")
