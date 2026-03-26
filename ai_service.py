@@ -18,8 +18,8 @@ class AIAgroConsultant:
     def __init__(self):
         self.api_key = QWEN_API_KEY
         self.model = QWEN_MODEL or "qwen2.5:7b"
-        self.local_mode = QWEN_LOCAL == "true"
-        
+        self.local_mode = QWEN_LOCAL  # Уже булево из config.py
+
         if self.local_mode:
             # Локальный Ollama
             self.url = OLLAMA_URL or "http://localhost:11434/api/generate"
