@@ -277,6 +277,9 @@ class AIAgroConsultant:
         headers = {"Content-Type": "application/json"}
 
         try:
+            logger.info(f"Ollama запрос: URL={self.url}, model={self.model}")
+            logger.info(f"Ollama payload: messages={len(messages)}, temp=0.7")
+            
             session = await self._get_session()
             async with session.post(
                 self.url,
@@ -284,6 +287,7 @@ class AIAgroConsultant:
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=API_TIMEOUT)
             ) as response:
+                logger.info(f"Ollama response status: {response.status}")
                 result = await response.json()
 
                 if response.status != 200:
