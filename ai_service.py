@@ -21,8 +21,8 @@ class AIAgroConsultant:
         self.local_mode = QWEN_LOCAL  # Уже булево из config.py
 
         if self.local_mode:
-            # Локальный Ollama
-            self.url = OLLAMA_URL or "http://localhost:11434/api/generate"
+            # Локальный Ollama - используем /api/chat для messages
+            self.url = OLLAMA_URL.replace("/api/generate", "/api/chat") or "http://localhost:11434/api/chat"
             logger.info(f"Qwen локальный режим: {self.model} на {self.url}")
         else:
             # Облако Alibaba DashScope
