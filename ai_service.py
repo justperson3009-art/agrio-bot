@@ -21,8 +21,8 @@ class AIAgroConsultant:
         self.local_mode = QWEN_LOCAL  # Уже булево из config.py
 
         if self.local_mode:
-            # Локальный Ollama - используем /api/chat для messages
-            self.url = OLLAMA_URL.replace("/api/generate", "/api/chat") or "http://localhost:11434/api/chat"
+            # Локальный Ollama - используем /api/generate для prompt
+            self.url = OLLAMA_URL or "http://localhost:11434/api/generate"
             logger.info(f"Qwen локальный режим: {self.model} на {self.url}")
         else:
             # Облако Alibaba DashScope
@@ -252,21 +252,21 @@ class AIAgroConsultant:
         system_prompt: str,
         dialog_context: List[Dict[str, str]] = None
     ) -> str:
-        """Запрос к локальной Qwen модели через Ollama"""
-        # Формируем промпт
-        messages = [{"role": "system", "content": system_prompt}]
+        """Запрос к локальной Qwen модели через Ollama (api/generate)"""
+        # Формируем промпт в формате /api/generate
+        prompt = f"{system_prompt}\n\n"
         
         if dialog_context:
             for msg in dialog_context:
-                role = "assistant" if msg["role"] == "assistant" else msg["role"]
-                messages.append({"role": role, "content": msg["content"]})
+                role = "Вы" if msg["role"] == "assistant" else "Пользователь"
+                prompt += f"{role}: {msg['content']}\n"
         
-        messages.append({"role": "user", "content": user_message})
+        prompt += f"Пользователь: {user_message}\nАссистент:"
 
-        # Тело запроса для Ollama
+        # Тело запроса для Ollama /api/generate
         payload = {
             "model": self.model,
-            "messages": messages,
+            "prompt": prompt,
             "stream": False,
             "options": {
                 "temperature": 0.7,
@@ -278,8 +278,8 @@ class AIAgroConsultant:
 
         try:
             logger.info(f"Ollama запрос: URL={self.url}, model={self.model}")
-            logger.info(f"Ollama payload: messages={len(messages)}, temp=0.7")
-            
+            logger.info(f"Ollama payload: prompt_length={len(prompt)}, temp=0.7")
+
             session = await self._get_session()
             async with session.post(
                 self.url,
@@ -294,9 +294,8 @@ class AIAgroConsultant:
                     logger.error(f"Ошибка Ollama API: {result}")
                     return "Извините, произошла ошибка. Попробуйте позже."
 
-                # Ollama возвращает ответ в формате {"response": "..."} для /api/generate
-                # или {"message": {"content": "..."}} для /api/chat
-                answer = result.get("response", "") or result.get("message", {}).get("content", "")
+                # /api/generate возвращает {"response": "..."}
+                answer = result.get("response", "")
                 
                 # Логирование для отладки
                 logger.info(f"Ollama result keys: {list(result.keys())}")
