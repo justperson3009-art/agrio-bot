@@ -267,7 +267,7 @@ class AIAgroConsultant:
             "stream": False,
             "options": {
                 "temperature": 0.7,
-                "num_predict": 300  # Ограничим длину ответа для скорости
+                "num_predict": 600  # Достаточно для полного ответа
             }
         }
 
