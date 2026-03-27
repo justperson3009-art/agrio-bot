@@ -233,11 +233,8 @@ class AIAgroConsultant:
         if cached:
             return cached
 
-        seed_recommendations = self.get_seed_recommendations(user_message)
+        # Бот отвечает на любые агро-вопросы, без привязки к сортам Agrio
         system_prompt = SYSTEM_PROMPT
-        
-        if seed_recommendations:
-            system_prompt += f"\n\n🌱 ДОП. ДАННЫЕ О СЕМЕНАХ:\n{seed_recommendations}"
 
         if self.local_mode:
             # ЛОКАЛЬНЫЙ РЕЖИМ (Ollama)
@@ -270,7 +267,7 @@ class AIAgroConsultant:
             "stream": False,
             "options": {
                 "temperature": 0.7,
-                "num_predict": 500  # Ограничим длину ответа для скорости
+                "num_predict": 300  # Ограничим длину ответа для скорости
             }
         }
 
