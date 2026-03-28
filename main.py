@@ -69,8 +69,8 @@ async def cmd_start(message: Message):
         "🛒 **Где купить семена AGRIO:**\n"
         "🌐 Сайт: agrio.by\n"
         "📦 Ozon: ozon.by/seller/agrio/\n"
-        "📦 Wildberries: wildberries.ru/catalog/327815053\n\n"
-        "💡 Задайте мне вопрос о растениях!"
+        "📦 Wildberries: wildberries.kg/seller/4182657\n\n"
+        "💡 Задайте мне вопрос о растениях или используйте /catalog для просмотра всех семян!"
     )
 
 
@@ -200,7 +200,7 @@ async def cmd_catalog(message: Message):
                 result += f"• **{seed.name}**\n"
     
     result += "\n🛒 **Где купить:**\n"
-    result += "🌐 agrio.by | 📦 ozon.by/seller/agrio/ | 📦 WB: wildberries.ru/catalog/327815053\n\n"
+    result += "🌐 agrio.by | 📦 ozon.by/seller/agrio/ | 📦 WB: wildberries.kg/seller/4182657\n\n"
     result += "💡 Спросите меня о любом сорте — дам инструкцию по посадке!"
     
     await message.answer(result)
@@ -341,7 +341,7 @@ async def handle_user_message(message: Message, state: FSMContext):
             "🏪 **AGRIO.BY** — магазин семян\n"
             "🌐 Сайт: agrio.by\n"
             "📦 Ozon: ozon.by/seller/agrio/\n"
-            "📦 WB: wildberries.ru/catalog/327815053\n\n"
+            "📦 WB: wildberries.kg/seller/4182657\n\n"
             "🌱 Задайте вопрос о выращивании растений!"
         )
         return

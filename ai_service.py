@@ -51,7 +51,7 @@ class AIAgroConsultant:
         info = "🏪 **Где купить семена AGRIO:**\n\n"
         info += "🌐 **Сайт:** agrio.by\n"
         info += "📦 **Ozon:** ozon.by/seller/agrio/\n"
-        info += "📦 **Wildberries:** wildberries.ru/catalog/327815053\n\n"
+        info += "📦 **Wildberries:** wildberries.kg/seller/4182657\n\n"
         info += "💡 **Доставка:** по всей Беларуси и России\n"
 
         current_month = datetime.now().month
