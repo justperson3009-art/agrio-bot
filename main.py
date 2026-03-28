@@ -251,7 +251,64 @@ def get_chat_mode(chat_id: int) -> str:
     return "unknown"
 
 
-@dp.message(F.text)
+def get_catalog_response() -> str:
+    """Готовый ответ о всех сортах семян AGRIO"""
+    all_seeds = seeds_db.seeds
+    
+    # Группируем по категориям
+    categories = {}
+    for seed in all_seeds:
+        cat = seed.category
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(seed)
+    
+    # Формируем ответ
+    result = "🌱 **ВСЕ СЕМЕНА AGRIO.BY (104 сорта)**\n\n"
+    
+    category_order = [
+        ("томат", "🍅 ТОМАТЫ", 29),
+        ("перец", "🌶️ ПЕРЕЦ", 13),
+        ("морковь", "🥕 МОРКОВЬ", 7),
+        ("капуста белокочанная", "🥬 КАПУСТА", 8),
+        ("арбуз", "🍉 АРБУЗ", 7),
+        ("кабачок", "🥒 КАБАЧОК", 7),
+        ("тыква", "🎃 ТЫКВА", 7),
+        ("брокколи", "🥦 БРОККОЛИ", 7),
+        ("дыня", "🍈 ДЫНЯ", 7),
+        ("баклажан", "🍆 БАКЛАЖАН", 3),
+        ("кукуруза сахарная", "🌽 КУКУРУЗА", 2),
+        ("цветная капуста", "🥬 ЦВЕТНАЯ КАПУСТА", 2),
+        ("петрушка", "🌿 ПЕТРУШКА", 1),
+        ("редис", "🔴 РЕДИС", 1),
+        ("свекла столовая", "🔴 СВЕКЛА", 1),
+        ("спаржевая фасоль", "🫘 ФАСОЛЬ", 2),
+    ]
+    
+    for cat_key, cat_name, _ in category_order:
+        if cat_key in categories:
+            result += f"\n{cat_name}:\n"
+            for seed in categories[cat_key]:
+                result += f"• **{seed.name}**\n"
+    
+    result += "\n🛒 **Где купить:**\n"
+    result += "🌐 agrio.by | 📦 ozon.by/seller/agrio/ | 📦 WB: wildberries.kg/seller/4182657\n\n"
+    result += "💡 Спросите меня о любом сорте — дам инструкцию по посадке!"
+    
+    return result
+
+
+def is_catalog_question(text: str) -> bool:
+    """Проверка: пользователь спрашивает про ассортимент семян?"""
+    catalog_keywords = [
+        'какие сорт', 'какие семен', 'какие растени', 'ассортимент',
+        'что есть', 'что у вас', 'список сорт', 'полный список',
+        'все сорт', 'все семен', 'каталог', 'номенклатур'
+    ]
+    text_lower = text.lower()
+    return any(keyword in text_lower for keyword in catalog_keywords)
+
+
 async def handle_user_message(message: Message, state: FSMContext):
     """Обработчик сообщений от пользователя"""
     user_text = message.text
@@ -345,8 +402,14 @@ async def handle_user_message(message: Message, state: FSMContext):
             "🌱 Задайте вопрос о выращивании растений!"
         )
         return
-    
+
     logger.info(f"Модерация пройдена")
+
+    # Проверка: вопрос про ассортимент семян? (готовый ответ без ИИ)
+    if is_catalog_question(user_text):
+        logger.info("Вопрос про ассортимент — отправляем готовый каталог")
+        await message.answer(get_catalog_response())
+        return
 
     # Проверка на prompt injection
     if await ai_consultant.check_injection_attempt(user_text):
