@@ -81,10 +81,9 @@ async def cmd_help(message: Message):
         "📚 **Команды бота:**\n\n"
         "/start - Начать общение\n"
         "/help - Показать эту справку\n"
+        "/catalog - Показать ВСЕ семена AGRIO по категориям\n"
         "/about - О проекте Agrio\n"
-        "/status - Проверить состояние бота\n"
-        "/seeds - Показать каталог семян AGRIO\n"
-        "/seed [запрос] - Поиск семян (например: /seed томат)\n\n"
+        "/status - Проверить состояние бота\n\n"
         "💡 **Как использовать:**\n"
         "• В личных чатах: просто пишите вопрос\n"
         "• В группах: упоминайте бота @Agrio_Bot\n\n"
@@ -92,7 +91,8 @@ async def cmd_help(message: Message):
         "• «Когда сажать томаты на рассаду?»\n"
         "• «Какие томаты лучше для теплицы?»\n"
         "• «Посоветуй ранний перец»\n"
-        "• «Как ухаживать за баклажанами?»\n\n"
+        "• «Как ухаживать за баклажанами?»\n"
+        "• «Какие сорта у вас есть?»\n\n"
         "🛒 **Где купить:**\n"
         "• «Где купить семена?»\n"
         "• «Есть ли у вас сайт?»\n"
@@ -142,94 +142,68 @@ async def cmd_status(message: Message):
     await message.answer(status_text)
 
 
-@dp.message(Command("seeds"))
-async def cmd_seeds(message: Message):
-    """Обработчик команды /seeds - показать каталог семян"""
-    catalog = seeds_db.get_catalog_summary()
+@dp.message(Command("catalog"))
+async def cmd_catalog(message: Message):
+    """Обработчик команды /catalog - показать ВСЕ семена по категориям"""
     
-    catalog_text = (
-        f"{catalog}\n\n"
-        "🔍 **Поиск семян:**\n"
-        "• `/seed томат` — показать все томаты\n"
-        "• `/seed СУПЕРНОВА` — найти конкретный сорт\n"
-        "• `/seed ранний томат` — поиск по характеристикам\n\n"
-        "💡 **Рекомендации:**\n"
-        "Просто спросите: «Какие томаты лучше для теплицы?»\n"
-        "Или: «Посоветуй ранний перец для открытого грунта»"
-    )
+    # Получаем все семена из базы
+    all_seeds = seeds_db.seeds
     
-    await message.answer(catalog_text)
-
-
-@dp.message(Command("seed"))
-async def cmd_seed(message: Message):
-    """Обработчик команды /seed - поиск конкретного семени"""
-    # Получаем аргумент команды
-    args = message.text.split(maxsplit=1)
+    # Группируем по категориям
+    categories = {}
+    for seed in all_seeds:
+        cat = seed.category
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(seed)
     
-    if len(args) < 2:
-        await message.answer(
-            "🔍 **Поиск семян**\n\n"
-            "Использование:\n"
-            "• `/seed томат` — все томаты\n"
-            "• `/seed СУПЕРНОВА` — конкретный сорт\n"
-            "• `/seed ранний томат` — по характеристикам"
-        )
-        return
+    # Формируем ответ по категориям
+    result = "🌱 **ВСЕ СЕМЕНА AGRIO.BY**\n\n"
     
-    query = args[1]
+    # Порядок категорий
+    category_order = [
+        ("томат", "🍅 ТОМАТЫ"),
+        ("перец", "🌶️ ПЕРЕЦ"),
+        ("морковь", "🥕 МОРКОВЬ"),
+        ("капуста белокочанная", "🥬 КАПУСТА"),
+        ("арбуз", "🍉 АРБУЗ"),
+        ("кабачок", "🥒 КАБАЧОК"),
+        ("тыква", "🎃 ТЫКВА"),
+        ("брокколи", "🥦 БРОККОЛИ"),
+        ("дыня", "🍈 ДЫНЯ"),
+        ("баклажан", "🍆 БАКЛАЖАН"),
+        ("кукуруза сахарная", "🌽 КУКУРУЗА"),
+        ("цветная капуста", "🥬 ЦВЕТНАЯ КАПУСТА"),
+        ("петрушка", "🌿 ПЕТРУШКА"),
+        ("редис", "🔴 РЕДИС"),
+        ("свекла столовая", "🔴 СВЕКЛА"),
+        ("спаржевая фасоль", "🫘 ФАСОЛЬ"),
+    ]
     
-    # Пробуем найти по названию
-    seed = seeds_db.get_seed_by_name(query)
-    
-    if seed:
-        # Нашли конкретный сорт
-        info = seeds_db.format_seed_info(seed)
-        await message.answer(info)
-        return
-    
-    # Если не нашли точное совпадение, ищем по категории или характеристикам
-    seeds = seeds_db.search_by_name(query)
-    
-    if not seeds:
-        # Пробуем поиск по категории
-        category_seeds = seeds_db.get_seeds_by_category(query)
-        if category_seeds:
-            seeds = category_seeds[:10]  # Максимум 10
-    
-    if not seeds:
-        # Поиск по характеристикам
-        keywords = query.split()
-        seeds = seeds_db.search_by_features(keywords)
-    
-    if seeds:
-        if len(seeds) == 1:
-            info = seeds_db.format_seed_info(seeds[0])
-            await message.answer(info)
-        else:
-            # Показываем краткий список
-            result = f"🔍 **Найдено по запросу «{query}»:**\n\n"
-            for i, seed in enumerate(seeds[:10], 1):
-                result += f"{i}. **{seed.name}** ({seed.category})\n"
+    for cat_key, cat_name in category_order:
+        if cat_key in categories:
+            result += f"\n{cat_name} ({len(categories[cat_key])}):\n"
+            for seed in categories[cat_key]:
+                result += f"• **{seed.name}**"
                 if seed.ripening_period:
-                    result += f"   📅 {seed.ripening_period}"
+                    result += f" ({seed.ripening_period})"
                 if seed.fruit_weight:
-                    result += f" | ⚖️ {seed.fruit_weight}"
+                    result += f" {seed.fruit_weight}"
                 result += "\n"
-            
-            if len(seeds) > 10:
-                result += f"\n... и ещё {len(seeds) - 10} сортов\n"
-            
-            result += "\n💡 Используйте `/seed [название]` для подробной информации"
-            await message.answer(result)
-    else:
-        await message.answer(
-            f"❌ Ничего не найдено по запросу «{query}»\n\n"
-            "Попробуйте:\n"
-            "• Проверить правильность названия\n"
-            "• Использовать категорию (томат, перец, морковь)\n"
-            "• Запросить рекомендации: «Какие томаты лучше?»"
-        )
+    
+    # Остальные категории
+    processed = [c[0] for c in category_order]
+    for cat_key in categories:
+        if cat_key not in processed:
+            result += f"\n{cat_key.upper()} ({len(categories[cat_key])}):\n"
+            for seed in categories[cat_key]:
+                result += f"• **{seed.name}**\n"
+    
+    result += "\n🛒 **Где купить:**\n"
+    result += "🌐 agrio.by | 📦 ozon.by/seller/agrio/ | 📦 WB: wildberries.ru/catalog/327815053\n\n"
+    result += "💡 Спросите меня о любом сорте — дам инструкцию по посадке!"
+    
+    await message.answer(result)
 
 
 def is_bot_mentioned(message: Message) -> bool:
