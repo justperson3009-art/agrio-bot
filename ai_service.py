@@ -267,7 +267,7 @@ class AIAgroConsultant:
             "stream": False,
             "options": {
                 "temperature": 0.7,
-                "num_predict": 600  # Достаточно для полного ответа
+                "num_predict": 400  # Баланс скорости и качества
             }
         }
 
