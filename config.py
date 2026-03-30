@@ -7,20 +7,18 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")
 ALLOWED_CHAT_IDS = os.getenv("ALLOWED_CHAT_IDS") or ""
 
-# Qwen API (облако Alibaba DashScope)
-QWEN_API_KEY = os.getenv("QWEN_API_KEY")
-
-# Локальная Qwen модель (Ollama)
-QWEN_LOCAL = os.getenv("QWEN_LOCAL", "false").lower() == "true"
-QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen2.5:7b")
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+# YandexGPT API (основная модель для гибридной системы)
+# Статические ключи сервисного аккаунта
+YANDEX_KEY_ID = os.getenv("YANDEX_KEY_ID")
+YANDEX_SECRET_KEY = os.getenv("YANDEX_SECRET_KEY")
+YANDEX_FOLDER_ID = os.getenv("YANDEX_FOLDER_ID")
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не найден в .env файле")
 
-# Проверка: либо QWEN_API_KEY для облака, либо QWEN_LOCAL=true для локальной версии
-if not QWEN_API_KEY and not QWEN_LOCAL:
-    raise ValueError("QWEN_API_KEY не найден И QWEN_LOCAL не установлен в true")
+# Проверка: YandexGPT обязателен для гибридной системы
+if not YANDEX_KEY_ID or not YANDEX_SECRET_KEY or not YANDEX_FOLDER_ID:
+    raise ValueError("YANDEX_KEY_ID, YANDEX_SECRET_KEY и YANDEX_FOLDER_ID должны быть указаны в .env")
 
 # Список разрешённых chat_id (через запятую) или пустой = все чаты разрешены
 if ALLOWED_CHAT_IDS and ALLOWED_CHAT_IDS.strip():

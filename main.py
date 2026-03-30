@@ -7,7 +7,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from config import BOT_TOKEN, ALLOWED_CHATS, CHAT_MENTION_ONLY, CHAT_AGRO_MODE, PRIVATE_CHATS
-from ai_service import AIAgroConsultant
+from ai_yandex import YandexGPTService
+from hybrid_ai import HybridAgroConsultant
 from moderation import moderate_message
 from logger import log_ai_request
 from seeds_database import seeds_db
@@ -26,7 +27,10 @@ logger = logging.getLogger(__name__)
 # Инициализация
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
-ai_consultant = AIAgroConsultant()
+
+# Гибридная система: база знаний + YandexGPT для сложных вопросов
+yandex_service = YandexGPTService()
+hybrid_consultant = HybridAgroConsultant()
 
 # Хранилище контекста диалога для каждого пользователя
 user_dialogs = {}
@@ -310,7 +314,7 @@ def is_catalog_question(text: str) -> bool:
 
 
 async def handle_user_message(message: Message, state: FSMContext):
-    """Обработчик сообщений от пользователя"""
+    """Обработчик сообщений от пользователя (гибридная система)"""
     user_text = message.text
     user_id = message.from_user.id
     username = message.from_user.username or f"user_{user_id}"
@@ -323,73 +327,43 @@ async def handle_user_message(message: Message, state: FSMContext):
     logger.info(f"Текст: {user_text[:100]}")
     logger.info(f"Bot username: @{bot_info_cache.get('username')}")
 
-    # Проверка: разрешён ли этот чат (если PRIVATE_CHATS настроены)
+    # Проверка: разрешён ли этот чат
     if PRIVATE_CHATS:
         if chat_id not in PRIVATE_CHATS:
             logger.warning(f"Чат {chat_id} не в списке разрешённых!")
-            return  # Игнорируем чат
-    
+            return
+
     # Определяем режим работы для этого чата
     chat_mode = get_chat_mode(chat_id)
     logger.info(f"Режим чата: {chat_mode}")
 
-    # Если группа — проверяем упоминание бота
+    # Если группа или mention_only — проверяем упоминание бота
     is_group = message.chat.type in ["group", "supergroup", "channel"]
-    
+
     if is_group or chat_mode == "mention":
-        # В группах или в чате mention_only — проверяем упоминание
         mentioned = is_bot_mentioned(message)
         logger.info(f"Бот упомянут: {mentioned}")
 
         if not mentioned:
             logger.info(f"Бот не упомянут — игнорируем")
-            return  # Бот не упомянут — игнорируем
+            return
 
         # Удаляем упоминание бота из текста
         bot_username = f"@{bot_info_cache.get('username')}"
         user_text = user_text.replace(bot_username, "").strip()
         user_text = user_text.replace(bot_username.lower(), "").strip()
 
-        # Если после удаления упоминания текст пустой
         if not user_text or user_text == "?":
             await message.answer(
                 "🌱 Задайте мне вопрос о растениях!\n\n"
                 "Например: когда сажать томаты?"
             )
             return
-    
+
     logger.info(f"Чат {chat_id} разрешён, продолжаем обработку...")
 
-    # Проверка: это группа или личный чат?
-    is_group = message.chat.type in ["group", "supergroup", "channel"]
-    logger.info(f"Тип чата: {message.chat.type}, is_group={is_group}")
-
-    # Если группа — проверяем упоминание бота
-    if is_group:
-        mentioned = is_bot_mentioned(message)
-        logger.info(f"Бот упомянут: {mentioned}, entities: {message.entities}")
-
-        if not mentioned:
-            logger.info(f"Бот не упомянут в группе — игнорируем")
-            # Бот не упомянут — игнорируем
-            return
-
-        # Удаляем упоминание бота из текста
-        bot_username = f"@{bot_info_cache.get('username')}"
-        user_text = user_text.replace(bot_username, "").strip()
-        user_text = user_text.replace(bot_username.lower(), "").strip()
-
-        # Если после удаления упоминания текст пустой
-        if not user_text or user_text == "?":
-            await message.answer(
-                "🌱 Задайте мне вопрос о растениях!\n\n"
-                "Например: когда сажать томаты?"
-            )
-            return
-    
+    # Проверка модерации
     logger.info(f"Проверка модерации для: {user_text[:50]}")
-
-    # Проверка на модерацию
     is_allowed, reason = moderate_message(user_text)
     if not is_allowed:
         logger.warning(f"Модерация заблокировала сообщение от {username}: {reason}")
@@ -419,36 +393,43 @@ async def handle_user_message(message: Message, state: FSMContext):
             "Задайте вопрос о растениях!"
         )
         return
-    
+
     logger.info(f"Проверка на injection пройдена")
 
     # Отправляем статус "печатает..."
     await bot.send_chat_action(chat_id=chat_id, action="typing")
-    
-    logger.info(f"Отправляем запрос к ИИ...")
 
     # Получаем контекст диалога
     context = get_user_context(user_id)
 
-    # Запрос к ИИ
+    # === ГИБРИДНАЯ СИСТЕМА ===
+    logger.info("Обработка гибридной системой...")
+    
     try:
-        response = await ai_consultant.get_consultation(user_text, context)
+        response, source = await hybrid_consultant.get_response(
+            message=user_text,
+            ai_service=yandex_service,
+            dialog_context=context
+        )
+        
+        logger.info(f"Ответ получен из источника: {source}")
+        
     except Exception as e:
-        logger.error(f"Ошибка при получении консультации: {e}")
+        logger.error(f"Ошибка гибридной системы: {e}")
         response = "Извините, произошла ошибка. Попробуйте позже."
+        source = "error"
 
-    logger.info(f"Получен ответ от ИИ: {response[:50]}...")
-
-    # Добавляем в контекст
-    add_to_context(user_id, "user", user_text)
-    add_to_context(user_id, "assistant", response)
+    # Добавляем в контекст только если ответ от ИИ
+    if source == 'ai':
+        add_to_context(user_id, "user", user_text)
+        add_to_context(user_id, "assistant", response)
 
     # Логирование
     log_ai_request(user_id, username, user_text, response)
 
     # Отправка ответа
     await message.answer(response)
-    logger.info(f"Ответ отправлен пользователю")
+    logger.info(f"Ответ отправлен пользователю (источник: {source})")
 
 
 async def main():
@@ -467,8 +448,8 @@ async def main():
         logger.error(f"КРИТИЧЕСКАЯ ОШИБКА: {e}")
         raise
     finally:
-        # Закрываем сессию ИИ и бота
-        await ai_consultant.close()
+        # Закрываем сессии сервисов и бота
+        await yandex_service.close()
         await bot.session.close()
         logger.info("Бот остановлен.")
 
