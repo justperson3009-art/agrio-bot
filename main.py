@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -57,6 +58,27 @@ def add_to_context(user_id: int, role: str, content: str):
     # Ограничиваем размер контекста
     if len(user_dialogs[user_id]) > 5:
         user_dialogs[user_id] = user_dialogs[user_id][-5:]
+
+
+def check_injection_attempt(message: str) -> bool:
+    """Проверка на Prompt Injection"""
+    injection_patterns = [
+        r"забудь\s+(все\s+)?инструкци",
+        r"игнорируй\s+(инструкци|правила)",
+        r"повтори\s+(системн|инструкци)",
+        r"раскрой\s+(промпт|настройк)",
+        r"ты\s+теперь\s+",
+        r"смени\s+роль",
+        r"новый\s+приказ",
+        r"системное\s+сообщение"
+    ]
+
+    message_lower = message.lower()
+    for pattern in injection_patterns:
+        if re.search(pattern, message_lower):
+            logger.warning(f"Попытка prompt injection: {message[:100]}")
+            return True
+    return False
 
 
 @dp.message(CommandStart())
@@ -408,7 +430,7 @@ async def handle_user_message(message: Message, state: FSMContext):
         return
 
     # Проверка на prompt injection
-    if await ai_consultant.check_injection_attempt(user_text):
+    if check_injection_attempt(user_text):
         logger.warning(f"Попытка injection от {username}")
         await message.answer(
             "⚠️ Я не могу изменить свои инструкции. "
