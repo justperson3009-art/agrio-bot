@@ -97,6 +97,9 @@ async def cmd_help(message: Message):
         "• «Посоветуй ранний перец»\n"
         "• «Как ухаживать за баклажанами?»\n"
         "• «Какие сорта у вас есть?»\n\n"
+        "📋 **Команда «Каталог»:**\n"
+        "Просто напишите **«Каталог»** или **«Коталог»** (даже с опечаткой!)\n"
+        "Бот покажет все 104 сорта семян по категориям!\n\n"
         "🛒 **Где купить:**\n"
         "• «Где купить семена?»\n"
         "• «Есть ли у вас сайт?»\n"
@@ -313,6 +316,19 @@ def is_catalog_question(text: str) -> bool:
     return any(keyword in text_lower for keyword in catalog_keywords)
 
 
+def is_catalog_command(text: str) -> bool:
+    """Проверка: команда 'Каталог' (в т.ч. с опечаткой 'Коталог')"""
+    text_lower = text.lower().strip()
+    # Точное совпадение или с опечаткой
+    return text_lower in ['каталог', 'коталог', 'каталог семян', 'коталог семян']
+
+
+@dp.message(F.text.lower().regexp(r'^(каталог|коталог)(\s*семян)?$'))
+async def cmd_catalog_text(message: Message):
+    """Обработчик команды 'Каталог' (в т.ч. с опечаткой 'Коталог')"""
+    await message.answer(get_catalog_response())
+
+
 async def handle_user_message(message: Message, state: FSMContext):
     """Обработчик сообщений от пользователя (гибридная система)"""
     user_text = message.text
@@ -378,6 +394,12 @@ async def handle_user_message(message: Message, state: FSMContext):
         return
 
     logger.info(f"Модерация пройдена")
+
+    # Проверка: команда "Каталог" (в т.ч. с опечаткой "Коталог")
+    if is_catalog_command(user_text):
+        logger.info("Команда 'Каталог' — отправляем полный каталог")
+        await message.answer(get_catalog_response())
+        return
 
     # Проверка: вопрос про ассортимент семян? (готовый ответ без ИИ)
     if is_catalog_question(user_text):
