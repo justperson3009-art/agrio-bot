@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from seeds_database import seeds_db, SeedVariety
 from seed_descriptions.all_descriptions import get_seed_description
+from seed_descriptions.crop_guides import get_crop_guide, get_all_crops
 
 logger = logging.getLogger(__name__)
 
@@ -1155,6 +1156,56 @@ class HybridAgroConsultant:
 
         return result
 
+    def _get_crop_guide(self, message: str) -> Optional[str]:
+        """
+        Получить универсальное руководство по культуре.
+        Распознаёт запросы вида:
+        - "как сажать томаты"
+        - "выращивание огурцов"
+        - "когда сажать арбузы"
+        - "уход за капустой"
+        """
+        message_lower = message.lower().strip()
+
+        # Ключевые слова для определения культуры
+        crop_keywords = {
+            "томат": ["томат", "помидор", "томаты", "помидоры"],
+            "перец": ["перец", "перцы", "болгарский перец"],
+            "баклажан": ["баклажан", "баклажаны", "синенькие"],
+            "огурец": ["огурец", "огурцы"],
+            "морковь": ["морковь", "морковки"],
+            "капуста": ["капуста", "капусты", "белокочанная", "краснокочанная"],
+            "кабачок": ["кабачок", "кабачки"],
+            "тыква": ["тыква", "тыквы"],
+            "арбуз": ["арбуз", "арбузы"],
+            "дыня": ["дыня", "дыни"],
+            "кукуруза": ["кукуруза", "кукурузы"],
+            "брокколи": ["брокколи"],
+            "петрушка": ["петрушка", "петрушки"],
+            "редис": ["редис", "редиска"],
+            "свекла": ["свекла", "свёкла", "свеклы"],
+            "фасоль": ["фасоль", "фасоли", "спаржевая фасоль"],
+            "цветная капуста": ["цветная капуста"],
+        }
+
+        # Проверяем каждую культуру
+        for crop, keywords in crop_keywords.items():
+            for keyword in keywords:
+                if keyword in message_lower:
+                    # Проверяем что это не вопрос о конкретном сорте
+                    # (если в сообщении есть название сорта — обрабатываем как сорт)
+                    for seed in seeds_db.seeds:
+                        if seed.name.lower().replace(" f1", "") in message_lower:
+                            return None  # Это вопрос о сорте, а не о культуре
+
+                    # Нашли культуру — возвращаем руководство
+                    guide = get_crop_guide(crop)
+                    if guide:
+                        logger.debug(f"Вопрос о культуре: {crop}")
+                        return guide
+
+        return None
+
     def _format_seed_recommendations(self, category: str, recommendations: List[SeedVariety]) -> str:
         """Форматирование рекомендаций по семенам"""
         category_name = category.upper().replace('_', ' ')
@@ -1324,6 +1375,12 @@ class HybridAgroConsultant:
         if seed_desc:
             logger.info(f"Вопрос о конкретном сорте — отвечаем из описаний")
             return seed_desc, 'seed_info'
+
+        # 2.6. Проверка на вопрос о культуре (без указания сорта)
+        crop_guide = self._get_crop_guide(message)
+        if crop_guide:
+            logger.info(f"Вопрос о культуре — отвечаем из руководства")
+            return crop_guide, 'crop_guide'
 
         # 3. Проверка на вопрос о семенах
         is_seed, seed_category = self.is_seed_question(message)
