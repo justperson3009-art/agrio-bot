@@ -5,6 +5,10 @@ from typing import List, Dict, Optional, Tuple
 from seeds_database import seeds_db, SeedVariety
 from seed_descriptions.all_descriptions import get_seed_description
 from seed_descriptions.crop_guides import get_crop_guide, get_all_crops
+from seed_descriptions.climate_and_calendar import (
+    get_climate_info, get_all_countries,
+    get_planting_calendar, get_all_months
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1206,6 +1210,52 @@ class HybridAgroConsultant:
 
         return None
 
+    def _get_climate_or_calendar(self, message: str) -> Optional[str]:
+        """
+        Получить информацию о климате или календарь посадок.
+        Распознаёт запросы вида:
+        - "климат в россии"
+        - "когда сажать"
+        - "календарь посадок"
+        - "что сажать в мае"
+        """
+        message_lower = message.lower().strip()
+
+        # 1. Проверка на вопрос о климате
+        climate_keywords = ['климат', 'погода', 'какой климат', 'какая погода', 'климатические']
+        for keyword in climate_keywords:
+            if keyword in message_lower:
+                # Ищем страну
+                for country in get_all_countries():
+                    if country in message_lower:
+                        result = get_climate_info(country)
+                        if result:
+                            logger.debug(f"Вопрос о климате: {country}")
+                            return result
+
+        # 2. Проверка на вопрос о календаре
+        calendar_keywords = [
+            'календарь', 'когда сажать', 'когда лучше', 'когда высаживать',
+            'сроки посадки', 'что сажать', 'когда сеять', 'когда сажать в'
+        ]
+        for keyword in calendar_keywords:
+            if keyword in message_lower:
+                # Ищем месяц
+                for month in get_all_months():
+                    if month in message_lower:
+                        result = get_planting_calendar(month)
+                        if result:
+                            logger.debug(f"Вопрос о календаре: {month}")
+                            return result
+
+                # Если месяц не указан — текущий месяц
+                result = get_planting_calendar()
+                if result:
+                    logger.debug("Вопрос о календаре — текущий месяц")
+                    return result
+
+        return None
+
     def _format_seed_recommendations(self, category: str, recommendations: List[SeedVariety]) -> str:
         """Форматирование рекомендаций по семенам"""
         category_name = category.upper().replace('_', ' ')
@@ -1381,6 +1431,12 @@ class HybridAgroConsultant:
         if crop_guide:
             logger.info(f"Вопрос о культуре — отвечаем из руководства")
             return crop_guide, 'crop_guide'
+
+        # 2.7. Проверка на климат или календарь
+        climate_cal = self._get_climate_or_calendar(message)
+        if climate_cal:
+            logger.info(f"Вопрос о климате/календаре — отвечаем из справочника")
+            return climate_cal, 'climate_calendar'
 
         # 3. Проверка на вопрос о семенах
         is_seed, seed_category = self.is_seed_question(message)
