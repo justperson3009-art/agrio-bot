@@ -8,9 +8,7 @@ def get_start_response() -> str:
     """Ответ на команду /start"""
     return (
         "🌱 **Добро пожаловать в Agrio-Бот!**\n\n"
-        "🏪 **AGRIO.BY** — ваш надёжный поставщик профессиональных семян\n"
-        "📍 аг. Ольшаны, Столинский район, Брестская область, Беларусь\n"
-        "📞 +375 29 795 99 68\n"
+        "🏪 **AGRIO.BY** — ваш надёжный поставщик профессиональных семян\n\n"
         "🌐 **Сайт:** [agrio.by](https://agrio.by)\n"
         "📦 **Ozon:** [ozon.by/seller/agrio/](https://ozon.by/seller/agrio/)\n"
         "📦 **Wildberries:** [wildberries.kg/seller/4182657](https://wildberries.kg/seller/4182657)\n\n"
