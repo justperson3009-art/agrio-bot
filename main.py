@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
@@ -52,7 +52,7 @@ def get_chat_mode(chat_id: int) -> str:
     return "unknown"
 
 
-@dp.message()
+@dp.message(~F.text.startswith('/'))
 async def handle_all_messages(message: Message, state: FSMContext):
     """Обработчик всех сообщений — делегирует в user_messages"""
     chat_id = message.chat.id
