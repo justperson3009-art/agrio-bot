@@ -3,10 +3,14 @@
 Содержит полную информацию о сортах и гибридах с рекомендациями
 
 Данные взяты с официального сайта agrio.by (93 сорта)
+Каждый сорт имеет детальное описание: сроки, уход, выращивание
 """
 
 from typing import Dict, List, Optional
 from dataclasses import dataclass, asdict
+
+# Импорт описаний сортов
+from seed_descriptions.all_descriptions import ALL_SEED_DESCRIPTIONS
 
 
 @dataclass
@@ -39,6 +43,29 @@ class SeedsDatabase:
     def __init__(self):
         self.seeds: List[SeedVariety] = []
         self._init_database()
+        self._apply_descriptions()
+
+    def _apply_descriptions(self):
+        """Применить описания к семенам из модуля seed_descriptions"""
+        for seed in self.seeds:
+            desc = ALL_SEED_DESCRIPTIONS.get(seed.name.upper())
+            if desc:
+                if desc.get("ripening_period"):
+                    seed.ripening_period = desc["ripening_period"]
+                if desc.get("fruit_weight"):
+                    seed.fruit_weight = desc["fruit_weight"]
+                if desc.get("features"):
+                    seed.features = desc["features"]
+                if desc.get("growing_conditions"):
+                    seed.growing_conditions = desc["growing_conditions"]
+                if desc.get("purpose"):
+                    seed.purpose = desc["purpose"]
+                if desc.get("yield_level"):
+                    seed.yield_level = desc["yield_level"]
+                if desc.get("disease_resistance"):
+                    seed.disease_resistance = desc["disease_resistance"]
+                if desc.get("additional_info"):
+                    seed.additional_info = desc["additional_info"]
 
     def _init_database(self):
         """Инициализация базы данных семенами с сайта AGRIO.by"""

@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from seeds_database import seeds_db, SeedVariety
+from seed_descriptions.all_descriptions import get_seed_description
 
 logger = logging.getLogger(__name__)
 
@@ -1089,6 +1090,71 @@ class HybridAgroConsultant:
         
         return None
 
+    def _get_specific_seed_description(self, message: str) -> Optional[str]:
+        """
+        Получить описание конкретного сорта из базы описаний.
+        Распознаёт запросы вида:
+        - "расскажи про СУПЕРНОВА"
+        - "что такое МАДРИД F1"
+        - "как сажать ГЕРКУЛЕС"
+        - "СУПЕРНОВА F1"
+        """
+        message_lower = message.lower().strip()
+
+        # Сначала ищем совпадение названия сорта в сообщении
+        found_seed = None
+        for seed in seeds_db.seeds:
+            seed_name_lower = seed.name.lower()
+            # Проверяем полное название или его часть (без F1)
+            if seed_name_lower in message_lower:
+                found_seed = seed
+                break
+            # Проверяем без "F1"
+            seed_name_no_f1 = seed.name.replace(" F1", "").lower()
+            if len(seed_name_no_f1) > 3 and seed_name_no_f1 in message_lower:
+                found_seed = seed
+                break
+
+        if not found_seed:
+            return None
+
+        # Получаем описание из модуля seed_descriptions
+        desc = get_seed_description(found_seed.name)
+        if not desc:
+            return None
+
+        # Формируем красивый ответ
+        result = f"**{found_seed.name}** ({found_seed.category})\n"
+        result += f"Тип: {found_seed.variety_type}\n\n"
+
+        if desc.get("ripening_period"):
+            result += f"📅 **Сроки:** {desc['ripening_period']}\n\n"
+
+        if desc.get("fruit_weight"):
+            result += f"⚖️ **Масса:** {desc['fruit_weight']}\n\n"
+
+        if desc.get("features"):
+            result += "✨ **Особенности:**\n"
+            for feature in desc["features"]:
+                result += f"• {feature}\n"
+            result += "\n"
+
+        if desc.get("growing_conditions"):
+            result += f"🌍 **Условия:** {desc['growing_conditions']}\n\n"
+
+        if desc.get("purpose"):
+            result += f"🎯 **Назначение:** {desc['purpose']}\n\n"
+
+        if desc.get("disease_resistance"):
+            result += f"🛡️ **Устойчивость:** {desc['disease_resistance']}\n\n"
+
+        if desc.get("additional_info"):
+            result += f"💡 **Совет:** {desc['additional_info']}\n\n"
+
+        result += "🛒 Купить: agrio.by | ozon.by/seller/agrio/ | wildberries.kg/seller/4182657"
+
+        return result
+
     def _format_seed_recommendations(self, category: str, recommendations: List[SeedVariety]) -> str:
         """Форматирование рекомендаций по семенам"""
         category_name = category.upper().replace('_', ' ')
@@ -1252,7 +1318,13 @@ class HybridAgroConsultant:
             if answer:
                 logger.info(f"Простой вопрос ({category}) — отвечаем из шаблона")
                 return answer, 'simple'
-        
+
+        # 2.5. Проверка на вопрос о конкретном сорте
+        seed_desc = self._get_specific_seed_description(message)
+        if seed_desc:
+            logger.info(f"Вопрос о конкретном сорте — отвечаем из описаний")
+            return seed_desc, 'seed_info'
+
         # 3. Проверка на вопрос о семенах
         is_seed, seed_category = self.is_seed_question(message)
         if is_seed:
