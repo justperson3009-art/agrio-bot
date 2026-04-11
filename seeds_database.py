@@ -296,6 +296,166 @@ class SeedsDatabase:
                 results.append(seed)
         return results
 
+    def get_recommendations_for_category(
+        self,
+        category: str,
+        criteria: Optional[Dict[str, str]] = None
+    ) -> List[SeedVariety]:
+        """
+        Получить рекомендации сортов для категории с учётом критериев.
+
+        Args:
+            category: категория (томат, перец, огурец и т.д.)
+            criteria: критерии отбора
+                - ripening_period: 'ранн', 'средн', 'поздн'
+                - growing_conditions: 'теплиц', 'открытый грунт'
+                - purpose: 'хранение', 'переработка', 'рынок'
+
+        Returns:
+            Список подходящих сортов (до 5)
+        """
+        # Сопоставление категории с данными базы
+        category_map = {
+            'томат': ['томат'],
+            'перец': ['перец'],
+            'перец чили': ['перец'],  # Чили — отдельная категория, но в базе как перец
+            'огурец': ['огурец'],
+            'морковь': ['морковь'],
+            'капуста': ['капуста белокочанная', 'цветная капуста'],
+            'цветная капуста': ['цветная капуста'],
+            'брокколи': ['брокколи'],
+            'баклажан': ['баклажан'],
+            'кабачок': ['кабачок'],
+            'цукини': ['кабачок'],  # Цукини — разновидность кабачка
+            'тыква': ['тыква'],
+            'редис': ['редис'],
+            'редька': [],  # Нет в базе
+            'картофель': [],  # Нет в базе
+            'батат': [],  # Нет в базе
+            'свекла': ['свекла столовая'],
+            'лук': [],  # Нет в базе
+            'чеснок': [],  # Нет в базе
+            'горох': [],  # Нет в базе
+            'фасоль': ['спаржевая фасоль'],
+            'кукуруза': ['кукуруза сахарная'],
+            'салат': [],  # Нет в базе
+            'шпинат': [],  # Нет в базе
+            'щавель': [],  # Нет в базе
+            'сельдерей': [],  # Нет в базе
+            'петрушка': ['петрушка'],
+            'укроп': [],  # Нет в базе
+            'базилик': [],  # Нет в базе
+            'кинза': [],  # Нет в базе
+            'руккола': [],  # Нет в базе
+            'арбуз': ['арбуз'],
+            'дыня': ['дыня'],
+            'капуста белокочанная': ['капуста белокочанная'],
+        }
+
+        db_categories = category_map.get(category, [category])
+
+        # Получаем все семена по категориям
+        results = []
+        for db_cat in db_categories:
+            results.extend(self.get_seeds_by_category(db_cat))
+
+        if not results:
+            return []
+
+        # Фильтрация по критериям
+        if criteria:
+            filtered = []
+            for seed in results:
+                match = True
+
+                if 'ripening_period' in criteria:
+                    period = criteria['ripening_period']
+                    seed_period = (seed.ripening_period or '').lower()
+                    if period and period not in seed_period:
+                        match = False
+
+                if 'growing_conditions' in criteria:
+                    conditions = criteria['growing_conditions']
+                    seed_conditions = (seed.growing_conditions or '').lower()
+                    if conditions == 'теплиц' and 'теплиц' not in seed_conditions and 'закрытый' not in seed_conditions:
+                        match = False
+                    elif conditions == 'открытый грунт' and 'открыт' not in seed_conditions and 'ог' not in seed_conditions:
+                        match = False
+
+                if 'purpose' in criteria:
+                    purpose = criteria['purpose']
+                    seed_purpose = (seed.purpose or '').lower()
+                    if purpose and purpose not in seed_purpose:
+                        match = False
+
+                if match:
+                    filtered.append(seed)
+
+            if filtered:
+                results = filtered
+
+        return results[:5]
+
+    def search_by_features(self, keywords: List[str]) -> List[SeedVariety]:
+        """
+        Поиск семян по ключевым словам (характеристики, особенности).
+
+        Ищет в описаниях, особенностях, условиях выращивания.
+
+        Args:
+            keywords: список ключевых слов
+
+        Returns:
+            Список подходящих сортов (до 5)
+        """
+        results = []
+        keywords_lower = [kw.lower() for kw in keywords]
+
+        for seed in self.seeds:
+            score = 0
+
+            # Поиск в названии
+            for kw in keywords_lower:
+                if kw in seed.name.lower():
+                    score += 3
+
+            # Поиск в категории
+            for kw in keywords_lower:
+                if kw in seed.category.lower():
+                    score += 2
+
+            # Поиск в описаниях
+            if seed.description:
+                for kw in keywords_lower:
+                    if kw in seed.description.lower():
+                        score += 1
+
+            # Поиск в особенностях
+            for feature in (seed.features or []):
+                for kw in keywords_lower:
+                    if kw in feature.lower():
+                        score += 1
+
+            # Поиск в условиях выращивания
+            if seed.growing_conditions:
+                for kw in keywords_lower:
+                    if kw in seed.growing_conditions.lower():
+                        score += 1
+
+            # Поиск в назначении
+            if seed.purpose:
+                for kw in keywords_lower:
+                    if kw in seed.purpose.lower():
+                        score += 1
+
+            if score > 0:
+                seed._search_score = score
+                results.append(seed)
+
+        # Сортировка по релевантности
+        results.sort(key=lambda s: getattr(s, '_search_score', 0), reverse=True)
+        return results[:5]
+
 
 # Глобальный экземпляр
 seeds_db = SeedsDatabase()

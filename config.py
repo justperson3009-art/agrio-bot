@@ -45,3 +45,9 @@ if CHAT_MENTION_ONLY and CHAT_MENTION_ONLY != 0:
     PRIVATE_CHATS.append(CHAT_MENTION_ONLY)
 if CHAT_AGRO_MODE and CHAT_AGRO_MODE != 0 and CHAT_AGRO_MODE != CHAT_MENTION_ONLY:
     PRIVATE_CHATS.append(CHAT_AGRO_MODE)
+
+# ==========================================
+# ПОГОДА API (OpenWeatherMap)
+# ==========================================
+# Получите бесплатно: https://openweathermap.org/api
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "")
