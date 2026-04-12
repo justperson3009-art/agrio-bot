@@ -19,11 +19,23 @@ logger = logging.getLogger(__name__)
 router = Router(name="commands")
 
 
+def _get_admin_kb_if_admin(user_id: int):
+    """Вернуть админ-клавиатуру только для ADMIN_ID"""
+    try:
+        from handlers.admin_handler import is_admin, get_admin_keyboard
+        if is_admin(user_id):
+            return get_admin_keyboard()
+    except:
+        pass
+    return None
+
+
 @router.message(CommandStart())
 async def cmd_start(message: Message):
     """Обработчик команды /start"""
     logger.info(f"Пользователь {message.from_user.id} отправил /start")
-    await message.answer(get_start_response())
+    kb = _get_admin_kb_if_admin(message.from_user.id)
+    await message.answer(get_start_response(), reply_markup=kb)
 
 
 @router.message(Command("help"))
