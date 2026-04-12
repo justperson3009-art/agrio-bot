@@ -52,13 +52,6 @@ hybrid_consultant = HybridAgroConsultant()
 # Кэш информации о боте
 bot_info_cache = {}
 
-# Админские кнопки (для фильтрации)
-ADMIN_BUTTONS = {
-    "📊 Статистика", "📧 Подписчики", "📢 Рассылка",
-    "❌ Ошибки", "📋 Лог", "💡 Совет всем",
-    "🙈 Скрыть меню", "❌ Отменить рассылку"
-}
-
 
 @dp.message(Command('menu'))
 async def cmd_menu(message: Message):
@@ -101,17 +94,9 @@ def get_chat_mode(chat_id: int) -> str:
 
 @dp.message(~F.text.startswith('/'))
 async def handle_all_messages(message: Message, state: FSMContext):
-    """Обработчик всех сообщений"""
-    # Игнорируем админские кнопки — их обрабатывает admin_router
-    if message.text in ADMIN_BUTTONS:
-        return
-
+    """Обработчик всех сообщений (НЕ команды и НЕ админские кнопки)"""
     chat_id = message.chat.id
     chat_type = message.chat.type
-
-    # Игнорируем админские кнопки
-    if message.text in ADMIN_BUTTONS:
-        return
 
     # Проверка: разрешён ли этот чат
     if PRIVATE_CHATS:

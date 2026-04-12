@@ -47,10 +47,18 @@ async def _autodel(msg, seconds=15):
 # === ОБРАБОТЧИК ВСЕХ АДМИНСКИХ КНОПОК ===
 @router.message(F.text.in_(ADMIN_TEXTS))
 async def handle_admin_buttons(message: Message):
-    if not is_admin(message.from_user.id):
+    text = message.text
+    user_id = message.from_user.id
+    
+    logger.info(f"Админская кнопка: {text} от user_id={user_id}")
+    
+    # Проверка админа
+    if not is_admin(user_id):
+        logger.warning(f"Попытка доступа к админке от user_id={user_id}")
+        sent = await message.answer("⛔ У вас нет прав администатора.")
+        await _autodel(sent, 5)
         return
 
-    text = message.text
     logger.info(f"Админская кнопка: {text} от {message.from_user.id}")
 
     # Удаляем сообщение с кнопкой
