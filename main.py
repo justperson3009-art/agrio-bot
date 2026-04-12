@@ -99,19 +99,13 @@ def get_chat_mode(chat_id: int) -> str:
     return "unknown"
 
 
-@dp.message(F.text.in_(ADMIN_BUTTONS))
-async def handle_admin_buttons(message: Message, state: FSMContext):
-    """Перехватываем админские кнопки ДО общего обработчика"""
-    # Просто логируем — admin_router обработает через свой роутер
-    # Но если вдруг admin_router не сработал — передаём дальше
-    logger.info(f"Админская кнопка: {message.text} от {message.from_user.id}")
-    # Пропускаем — admin_router зарегистрирован первым
-    return
-
-
 @dp.message(~F.text.startswith('/'))
 async def handle_all_messages(message: Message, state: FSMContext):
     """Обработчик всех сообщений"""
+    # Игнорируем админские кнопки — их обрабатывает admin_router
+    if message.text in ADMIN_BUTTONS:
+        return
+
     chat_id = message.chat.id
     chat_type = message.chat.type
 
