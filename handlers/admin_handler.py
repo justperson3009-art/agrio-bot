@@ -104,21 +104,14 @@ async def handle_admin_buttons(message: Message):
 
     elif text == "📢 Рассылка":
         await message.answer(
-            "📢 **Режим рассылки**\n\n"
-            "Просто напишите текст — он будет отправлен всем подписчикам.\n"
-            "Для отмены нажмите **❌ Отменить рассылку**",
+            "📢 **Режим рассылки** — напишите текст для подписчиков.\nДля отмены: **❌ Отменить рассылку**",
             reply_markup=ReplyKeyboardMarkup(
                 keyboard=[[KeyboardButton(text="❌ Отменить рассылку")]],
                 resize_keyboard=True
             )
         )
-        # Включаем режим рассылки
-        import main
-        main.broadcast_mode[user_id] = True
 
     elif text == "❌ Отменить рассылку":
-        import main
-        main.broadcast_mode.pop(user_id, None)
         sent = await message.answer("📢 Рассылка отменена.", reply_markup=get_admin_kb())
         await _autodel(sent, 5)
 
