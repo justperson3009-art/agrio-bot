@@ -240,6 +240,13 @@ async def catch_admin_buttons(message: Message):
 async def handle_all_messages(message: Message, state: FSMContext):
     """Обработчик всех сообщений (НЕ команды и НЕ админские кнопки)"""
     user_id = message.from_user.id
+    text = message.text
+    
+    # === ПРОВЕРКА: это админская кнопка? ===
+    if text in ADMIN_BUTTONS:
+        logger.info(f"ПЕРЕХВАЧЕНА АДМИНСКАЯ КНОПКА: '{text}' от user_id={user_id}")
+        await handle_admin_button(message)
+        return
     
     # Проверка: режим рассылки?
     if user_id in broadcast_mode and is_admin(user_id):
