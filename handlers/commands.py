@@ -22,9 +22,9 @@ router = Router(name="commands")
 def _get_admin_kb_if_admin(user_id: int):
     """Вернуть админ-клавиатуру только для ADMIN_ID"""
     try:
-        from handlers.admin_handler import is_admin, get_admin_keyboard
+        from handlers.admin_handler import is_admin, get_admin_kb
         if is_admin(user_id):
-            return get_admin_keyboard()
+            return get_admin_kb()
     except:
         pass
     return None

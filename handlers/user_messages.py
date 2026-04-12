@@ -90,7 +90,8 @@ async def handle_user_message(
 
     # Проверка: команда "Каталог" или вопрос про ассортимент
     if check_catalog_commands(user_text):
-        await message.answer(get_catalog_response())
+        from keyboards.feedback_keyboard import get_feedback_keyboard
+        await message.answer(get_catalog_response(), reply_markup=get_feedback_keyboard())
         return
 
     # Проверка на prompt injection
@@ -132,8 +133,13 @@ async def handle_user_message(
     # Логирование
     log_ai_request(user_id, username, user_text, response)
 
-    # Отправка ответа
-    await message.answer(response)
+    # Логирование запроса в статистику
+    from feedback_db import log_request
+    log_request(user_id)
+
+    # Отправка ответа с кнопками обратной связи
+    from keyboards.feedback_keyboard import get_feedback_keyboard
+    await message.answer(response, reply_markup=get_feedback_keyboard())
     logger.info(f"Ответ отправлен пользователю (источник: {source})")
 
 

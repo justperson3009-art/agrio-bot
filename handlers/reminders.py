@@ -4,10 +4,11 @@ from datetime import datetime
 from aiogram import Bot
 from aiogram.types import Message
 from aiogram.filters import Command
+from feedback_db import get_subscribers_list, add_subscriber, remove_subscriber
 
 logger = logging.getLogger(__name__)
 
-# Хранилище подписчиков (в памяти)
+# Хранилище подписчиков (в памяти + в БД)
 reminder_subscribers = set()
 
 # Еженедельные советы по месяцам
@@ -237,12 +238,15 @@ async def _send_weekly_tips(bot: Bot):
     month = datetime.now().month
     week_num = (datetime.now().day - 1) // 7
     week_num = min(week_num, 3)  # 0-3
-    
+
     tip = WEEKLY_TIPS.get(month, {}).get(week_num, "💡 Спросите меня о любой культуре!")
-    
-    for user_id in reminder_subscribers:
+
+    # Получаем подписчиков из БД
+    subs = get_subscribers_list()
+    for sub in subs:
         try:
-            await bot.send_message(user_id, tip)
-            logger.info(f"Еженедельный совет отправлен пользователю {user_id}")
+            await bot.send_message(sub['user_id'], tip)
+            reminder_subscribers.add(sub['user_id'])  # Синхронизируем с in-memory
+            logger.info(f"Еженедельный совет отправлен пользователю {sub['user_id']}")
         except Exception as e:
-            logger.error(f"Ошибка отправки совета пользователю {user_id}: {e}")
+            logger.error(f"Ошибка отправки совета пользователю {sub['user_id']}: {e}")

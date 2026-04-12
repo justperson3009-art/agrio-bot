@@ -1,11 +1,14 @@
 from aiogram import Router, F
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 import os
 import asyncio
 import logging
 from datetime import datetime
-from handlers.reminders import reminder_subscribers
+from feedback_db import (
+    get_stats, get_complaints, delete_complaint,
+    get_subscribers_list, add_subscriber, remove_subscriber
+)
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -19,18 +22,18 @@ def is_admin(user_id: int) -> bool:
 
 
 def get_admin_kb() -> ReplyKeyboardMarkup:
+    """Админ-клавиатура — ВСЕГДА видна админу"""
     return ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text="📊 Статистика"), KeyboardButton(text="📧 Подписчики")],
-        [KeyboardButton(text="📢 Рассылка"), KeyboardButton(text="❌ Ошибки")],
-        [KeyboardButton(text="📋 Лог"), KeyboardButton(text="💡 Совет всем")],
-        [KeyboardButton(text="🙈 Скрыть меню")],
+        [KeyboardButton(text="📢 Рассылка"), KeyboardButton(text="📝 Жалобы")],
+        [KeyboardButton(text="❌ Ошибки")],
     ], resize_keyboard=True)
 
 
 # Все админские кнопки
 ADMIN_TEXTS = {
     "📊 Статистика", "📧 Подписчики", "📢 Рассылка",
-    "❌ Ошибки", "📋 Лог", "💡 Совет всем", "🙈 Скрыть меню",
+    "📝 Жалобы", "❌ Ошибки",
     "❌ Отменить рассылку"
 }
 
@@ -49,17 +52,15 @@ async def _autodel(msg, seconds=15):
 async def handle_admin_buttons(message: Message):
     text = message.text
     user_id = message.from_user.id
-    
-    logger.info(f"Админская кнопка: {text} от user_id={user_id}")
-    
+
+    logger.info(f"АДМИНСКАЯ КНОПКА: '{text}' от user_id={user_id}")
+
     # Проверка админа
     if not is_admin(user_id):
         logger.warning(f"Попытка доступа к админке от user_id={user_id}")
         sent = await message.answer("⛔ У вас нет прав администатора.")
         await _autodel(sent, 5)
         return
-
-    logger.info(f"Админская кнопка: {text} от {message.from_user.id}")
 
     # Удаляем сообщение с кнопкой
     try:
@@ -68,62 +69,80 @@ async def handle_admin_buttons(message: Message):
         pass
 
     if text == "📊 Статистика":
-        unique = set()
-        count = 0
-        try:
-            with open('bot.log', 'r', encoding='utf-8') as f:
-                for line in f:
-                    if 'user_id=' in line:
-                        parts = line.split('user_id=')
-                        if len(parts) > 1:
-                            uid = parts[1].split(')')[0].strip()
-                            unique.add(uid)
-                            count += 1
-        except:
-            pass
+        stats = get_stats()
         sent = await message.answer(
-            f"📊 **СТАТИСТИКА**\n\n"
-            f"👥 Уникальных: {len(unique)}\n"
-            f"📝 Сообщений: {count}\n"
-            f"📧 Подписчиков: {len(reminder_subscribers)}",
-            reply_markup=get_admin_kb()
+            f"📊 **СТАТИСТИКА AGRIO BOT**\n\n"
+            f"👥 Пользователей: **{stats['total_users']}**\n"
+            f"📝 Всего запросов: **{stats['total_requests']}**\n"
+            f"📈 Запросов за неделю: **{stats['weekly_requests']}**\n\n"
+            f"👍 Полезных ответов: **{stats['positive_feedback']}**\n"
+            f"👎 Не полезных ответов: **{stats['negative_feedback']}**\n\n"
+            f"📧 Подписчиков на рассылку: **{stats['subscribers']}**\n"
+            f"📝 Жалоб с комментариями: **{stats['complaints_count']}**",
+            reply_markup=get_admin_kb(),
+            parse_mode="Markdown"
         )
-        await _autodel(sent, 15)
+        await _autodel(sent, 20)
 
     elif text == "📧 Подписчики":
-        if not reminder_subscribers:
+        subs = get_subscribers_list()
+        if not subs:
             sent = await message.answer("📧 Подписчиков пока нет.", reply_markup=get_admin_kb())
         else:
-            subs = "\n".join(f"• `{uid}`" for uid in sorted(reminder_subscribers))
-            if len(subs) > 4000:
-                subs = subs[:3900] + "\n\n...ещё"
-            sent = await message.answer(f"📧 **ПОДПИСЧИКИ** ({len(reminder_subscribers)}):\n\n{subs}", reply_markup=get_admin_kb())
+            lines = []
+            for s in subs:
+                lines.append(f"• `{s['user_id']}` (с {s['subscribed_at'][:10]})")
+            subs_text = "\n".join(lines)
+            if len(subs_text) > 4000:
+                subs_text = subs_text[:3900] + "\n\n...ещё"
+            sent = await message.answer(
+                f"📧 **ПОДПИСЧИКИ** ({len(subs)}):\n\n{subs_text}",
+                reply_markup=get_admin_kb(),
+                parse_mode="Markdown"
+            )
         await _autodel(sent, 20)
 
     elif text == "📢 Рассылка":
         await message.answer(
             "📢 **Режим рассылки**\n\n"
-            "Просто напишите текст — он будет отправлен всем подписчикам.",
+            "Просто напишите текст — он будет отправлен всем подписчикам.\n"
+            "Для отмены нажмите **❌ Отменить рассылку**",
             reply_markup=ReplyKeyboardMarkup(
                 keyboard=[[KeyboardButton(text="❌ Отменить рассылку")]],
                 resize_keyboard=True
             )
         )
+        # Включаем режим рассылки
+        import main
+        main.broadcast_mode[user_id] = True
 
     elif text == "❌ Отменить рассылку":
-        await message.answer("📢 Рассылка отменена.", reply_markup=get_admin_kb())
-
-    elif text == "💡 Совет всем":
-        status = await message.answer("📧 Отправляю совет подписчикам...")
-        try:
-            from handlers.reminders import _send_weekly_tips
-            await _send_weekly_tips(message.bot)
-            await status.edit_text(f"✅ Совет отправлен {len(reminder_subscribers)} подписчикам!")
-        except Exception as e:
-            await status.edit_text(f"❌ Ошибка: {e}")
-        await _autodel(status, 10)
-        sent = await message.answer("✅ Готово", reply_markup=get_admin_kb())
+        import main
+        main.broadcast_mode.pop(user_id, None)
+        sent = await message.answer("📢 Рассылка отменена.", reply_markup=get_admin_kb())
         await _autodel(sent, 5)
+
+    elif text == "📝 Жалобы":
+        complaints = get_complaints(limit=15)
+        if not complaints:
+            sent = await message.answer("✅ Жалоб нет!", reply_markup=get_admin_kb())
+        else:
+            txt = ""
+            for c in complaints:
+                txt += (
+                    f"👤 ID: `{c['user_id']}`\n"
+                    f"📝 Запрос: {c['message_text'][:100]}\n"
+                    f"❌ Жалоба: {c['comment'][:200]}\n"
+                    f"🕐 {c['created_at']}\n\n"
+                )
+            if len(txt) > 4000:
+                txt = txt[:4000] + "..."
+            sent = await message.answer(
+                f"📝 **ЖАЛОБЫ** ({len(complaints)}):\n\n{txt}",
+                reply_markup=get_admin_kb(),
+                parse_mode="Markdown"
+            )
+        await _autodel(sent, 25)
 
     elif text == "❌ Ошибки":
         try:
@@ -136,63 +155,13 @@ async def handle_admin_buttons(message: Message):
                 txt = ''.join(errors)
                 if len(txt) > 4000:
                     txt = txt[-4000:]
-                sent = await message.answer(f"❌ **ОШИБКИ** ({len(errors)}):\n\n```\n{txt}\n```", reply_markup=get_admin_kb())
+                sent = await message.answer(
+                    f"❌ **ОШИБКИ** ({len(errors)}):\n\n```\n{txt}\n```",
+                    reply_markup=get_admin_kb()
+                )
         except:
             sent = await message.answer("📋 Лог не найден.", reply_markup=get_admin_kb())
         await _autodel(sent, 20)
-
-    elif text == "📋 Лог":
-        try:
-            with open('bot.log', 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-            last = ''.join(lines[-30:])
-            if len(last) > 4000:
-                last = last[-4000:]
-            sent = await message.answer(f"📋 **ЛОГ (30 строк):**\n\n```\n{last}\n```", reply_markup=get_admin_kb())
-        except:
-            sent = await message.answer("📋 Лог не найден.", reply_markup=get_admin_kb())
-        await _autodel(sent, 20)
-
-    elif text == "🙈 Скрыть меню":
-        await message.answer("🙈 Админ-меню скрыто. Чтобы вернуть — /admin", reply_markup=ReplyKeyboardRemove())
-
-
-# === ОБРАБОТЧИК РАССЫЛКИ (ловит текст после нажатия "Рассылка") ===
-@router.message(F.text, ~F.text.startswith('/'))
-async def handle_broadcast_text(message: Message):
-    """Если админ написал текст после нажатия 'Рассылка'"""
-    if not is_admin(message.from_user.id):
-        return
-
-    text = message.text.strip()
-    if not text:
-        return
-
-    if not reminder_subscribers:
-        await message.answer("📧 Нет подписчиков.", reply_markup=get_admin_kb())
-        return
-
-    sent_count = 0
-    fail_count = 0
-    status = await message.answer(f"📢 **Рассылка...** 0/{len(reminder_subscribers)}")
-
-    for uid in list(reminder_subscribers):
-        try:
-            await message.bot.send_message(int(uid), text)
-            sent_count += 1
-        except Exception as e:
-            fail_count += 1
-            logger.error(f"Рассылка {uid}: {e}")
-        if (sent_count + fail_count) % 10 == 0:
-            try:
-                await status.edit_text(f"📢 **Рассылка...** {sent_count + fail_count}/{len(reminder_subscribers)}")
-            except:
-                pass
-
-    await status.edit_text(f"✅ **Готово!**\n📢 Отправлено: {sent_count}\n❌ Ошибок: {fail_count}")
-    await asyncio.sleep(5)
-    await message.bot.delete_message(message.chat.id, status.message_id)
-    await message.answer("✅ Рассылка завершена.", reply_markup=get_admin_kb())
 
 
 # === Команды ===
@@ -201,10 +170,3 @@ async def cmd_admin(message: Message):
     if not is_admin(message.from_user.id):
         return
     await message.answer("👤 **Админ-панель** — используйте кнопки внизу.", reply_markup=get_admin_kb())
-
-
-@router.message(Command('hide_admin'))
-async def cmd_hide(message: Message):
-    if not is_admin(message.from_user.id):
-        return
-    await message.answer("🙈 Админ-меню скрыто. /admin — вернуть.", reply_markup=ReplyKeyboardRemove())
