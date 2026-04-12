@@ -110,6 +110,11 @@ async def handle_all_messages(message: Message, state: FSMContext):
     user_id = message.from_user.id
     text = message.text
 
+    # === Пропускаем если пользователь в FSM (комментарий к feedback) ===
+    current_state = await state.get_state()
+    if current_state:
+        return  # Пусть обрабатывает feedback_handler
+
     # === ПЕРЕХВАТ АДМИНСКИХ КНОПОК ===
     if text in ADMIN_BUTTONS:
         logger.info(f"АДМИН КНОПКА: '{text}' от user_id={user_id}")

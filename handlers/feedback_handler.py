@@ -45,7 +45,7 @@ async def handle_feedback(callback: CallbackQuery, state: FSMContext):
 
     elif action == "negative":
         # Не полезно — просим комментарий
-        await state.set_data({"original_text": original_text})
+        await state.set_data({"original_text": original_text, "bot_message_id": callback.message.message_id})
         await state.set_state(FeedbackState.waiting_for_comment)
 
         await callback.message.edit_text(
@@ -63,7 +63,11 @@ async def handle_feedback_comment(message: Message, state: FSMContext):
     data = await state.get_data()
     original_text = data.get("original_text", "")
 
-    comment = message.text[:500]
+    comment = message.text.strip()[:500]
+    if not comment:
+        await message.answer("✍️ Напишите что именно было не так:")
+        return
+
     user_id = message.from_user.id
 
     add_feedback(user_id, original_text, is_positive=False, comment=comment)
@@ -71,6 +75,6 @@ async def handle_feedback_comment(message: Message, state: FSMContext):
 
     await state.clear()
     await message.answer(
-        "✅ Спасибо за обратную связь!\n"
-        "Мы учтём ваши пожелания для улучшения бота."
+        "✅ **Ваша жалоба принята!**\n\n"
+        "Спасибо за обратную связь — мы учтём ваши пожелания для улучшения бота."
     )

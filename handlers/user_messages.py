@@ -137,9 +137,17 @@ async def handle_user_message(
     from feedback_db import log_request
     log_request(user_id)
 
-    # Отправка ответа с кнопками обратной связи
-    from keyboards.feedback_keyboard import get_feedback_keyboard
-    await message.answer(response, reply_markup=get_feedback_keyboard())
+    # Отправка ответа
+    from config import ADMIN_ID
+    if user_id == int(ADMIN_ID or 0):
+        # Админ — всегда ReplyKeyboard с кнопками внизу
+        from handlers.admin_handler import get_admin_kb
+        await message.answer(response, reply_markup=get_admin_kb())
+    else:
+        # Обычный пользователь — inline кнопки Полезно/Не полезно
+        from keyboards.feedback_keyboard import get_feedback_keyboard
+        await message.answer(response, reply_markup=get_feedback_keyboard())
+
     logger.info(f"Ответ отправлен пользователю (источник: {source})")
 
 
