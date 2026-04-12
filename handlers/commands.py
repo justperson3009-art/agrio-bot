@@ -35,7 +35,10 @@ async def cmd_start(message: Message):
     """Обработчик команды /start"""
     logger.info(f"Пользователь {message.from_user.id} отправил /start")
     kb = _get_admin_kb_if_admin(message.from_user.id)
-    await message.answer(get_start_response(), reply_markup=kb)
+    if kb:
+        await message.answer(get_start_response(), reply_markup=kb)
+    else:
+        await message.answer(get_start_response())
 
 
 @router.message(Command("help"))
