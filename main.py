@@ -3,7 +3,7 @@ import logging
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardRemove
 
 from config import BOT_TOKEN, ALLOWED_CHATS, CHAT_MENTION_ONLY, CHAT_AGRO_MODE, PRIVATE_CHATS
 from ai_yandex import YandexGPTService
@@ -45,17 +45,23 @@ logger = logging.getLogger(__name__)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Гибридная система: база знаний + YandexGPT для сложных вопросов
+# Гибридная система
 yandex_service = YandexGPTService()
 hybrid_consultant = HybridAgroConsultant()
 
 # Кэш информации о боте
 bot_info_cache = {}
 
+# Админские кнопки (для фильтрации)
+ADMIN_BUTTONS = {
+    "📊 Статистика", "📧 Подписчики", "📢 Рассылка",
+    "❌ Ошибки", "📋 Лог", "💡 Совет всем",
+    "🙈 Скрыть меню", "❌ Отменить рассылку"
+}
+
 
 @dp.message(Command('menu'))
 async def cmd_menu(message: Message):
-    """Главное меню с inline-кнопками"""
     keyboard = get_main_menu_keyboard()
     await message.answer(
         "🌱 **Меню Agrio:**\n\n"
@@ -66,36 +72,26 @@ async def cmd_menu(message: Message):
 
 @dp.message(Command('subscribe'))
 async def cmd_subscribe(message: Message):
-    """Подписка на еженедельные советы"""
     user_id = message.from_user.id
     reminder_subscribers.add(user_id)
     await message.answer(
         "✅ **Вы подписаны на еженедельные советы!**\n\n"
-        "Каждый понедельник в 9:00 вы будете получать актуальный совет по огороду.\n\n"
+        "Каждый понедельник в 9:00 вы будете получать актуальный совет.\n\n"
         "Отписаться: /unsubscribe"
     )
 
 
 @dp.message(Command('unsubscribe'))
 async def cmd_unsubscribe(message: Message):
-    """Отписка от еженедельных советов"""
     user_id = message.from_user.id
     if user_id in reminder_subscribers:
         reminder_subscribers.discard(user_id)
-        await message.answer("❌ Вы отписались от еженедельных советов.")
+        await message.answer("❌ Вы отписались от рассылки.")
     else:
-        await message.answer("Вы не были подписаны на советы.")
+        await message.answer("Вы не были подписаны.")
 
 
 def get_chat_mode(chat_id: int) -> str:
-    """
-    Определить режим работы бота для чата.
-
-    Returns:
-        "mention" - отвечать только по упоминанию
-        "agro" - отвечать на все сообщения (режим агронома)
-        "unknown" - чат не настроен
-    """
     if chat_id == CHAT_MENTION_ONLY:
         return "mention"
     elif chat_id == CHAT_AGRO_MODE:
@@ -103,25 +99,34 @@ def get_chat_mode(chat_id: int) -> str:
     return "unknown"
 
 
+@dp.message(F.text.in_(ADMIN_BUTTONS))
+async def handle_admin_buttons(message: Message, state: FSMContext):
+    """Перехватываем админские кнопки ДО общего обработчика"""
+    # Просто логируем — admin_router обработает через свой роутер
+    # Но если вдруг admin_router не сработал — передаём дальше
+    logger.info(f"Админская кнопка: {message.text} от {message.from_user.id}")
+    # Пропускаем — admin_router зарегистрирован первым
+    return
+
+
 @dp.message(~F.text.startswith('/'))
 async def handle_all_messages(message: Message, state: FSMContext):
-    """Обработчик всех сообщений — делегирует в user_messages"""
+    """Обработчик всех сообщений"""
     chat_id = message.chat.id
     chat_type = message.chat.type
+
+    # Игнорируем админские кнопки
+    if message.text in ADMIN_BUTTONS:
+        return
 
     # Проверка: разрешён ли этот чат
     if PRIVATE_CHATS:
         if chat_id not in PRIVATE_CHATS:
-            logger.warning(f"Чат {chat_id} не в списке разрешённых!")
             return
 
-    # Определяем режим работы для этого чата
     chat_mode = get_chat_mode(chat_id)
-
-    # Определяем, является ли чат групповым
     is_group = chat_type in ["group", "supergroup", "channel"]
 
-    # Передаём обработку
     await handle_user_message(
         message=message,
         state=state,
@@ -134,26 +139,24 @@ async def handle_all_messages(message: Message, state: FSMContext):
 
 
 async def main():
-    """Запуск бота"""
     try:
-        # Регистрация ВСЕХ роутеров
-        dp.include_router(commands_router)
-        dp.include_router(catalog_router)
-        dp.include_router(tip_router)
-        dp.include_router(stats_router)
-        dp.include_router(photo_router)
-        dp.include_router(belarusian_router)
-        dp.include_router(admin_router)
-        dp.include_router(weather_router)
+        # === ПОРЯДОК ВАЖЕН! Админка ПЕРЕД общим обработчиком ===
+        dp.include_router(admin_router)       # 1. Админка (перехватывает кнопки)
+        dp.include_router(commands_router)    # 2. Команды
+        dp.include_router(catalog_router)     # 3. Каталог
+        dp.include_router(tip_router)         # 4. Совет дня
+        dp.include_router(stats_router)       # 5. Статистика
+        dp.include_router(photo_router)       # 6. Фото
+        dp.include_router(belarusian_router)  # 7. Белорусский
+        dp.include_router(weather_router)     # 8. Погода
 
         bot_info = await bot.get_me()
         logger.info(f"Бот авторизован: @{bot_info.username} (ID: {bot_info.id})")
 
-        # Кэшируем информацию о боте
         bot_info_cache["username"] = bot_info.username
         bot_info_cache["id"] = bot_info.id
 
-        # Запуск планировщика напоминаний
+        # Планировщик напоминаний
         asyncio.create_task(start_reminder_scheduler(bot))
         logger.info("Планировщик напоминаний запущен")
 
@@ -163,7 +166,6 @@ async def main():
         logger.error(f"КРИТИЧЕСКАЯ ОШИБКА: {e}")
         raise
     finally:
-        # Закрываем сессии сервисов и бота
         await yandex_service.close()
         await bot.session.close()
         logger.info("Бот остановлен.")
