@@ -215,13 +215,12 @@ async def handle_all_messages(message: Message, state: FSMContext):
             text = text.strip()
             if text:
                 from feedback_db import get_subscribers_list
-                from handlers.admin_handler import get_admin_kb, _autodel
+                from handlers.admin_handler import get_admin_kb
                 
                 subscribers = get_subscribers_list()
                 sent_count = 0
                 fail_count = 0
-                status_msg = await message.answer(f"📢 **Рассылка...** 0/{len(subscribers)}")
-
+                
                 for sub in subscribers:
                     try:
                         await message.bot.send_message(sub['user_id'], text)
@@ -229,20 +228,15 @@ async def handle_all_messages(message: Message, state: FSMContext):
                     except Exception as e:
                         fail_count += 1
                         logger.error(f"Рассылка {sub['user_id']}: {e}")
-                    if (sent_count + fail_count) % 10 == 0:
-                        try:
-                            await status_msg.edit_text(f"📢 **Рассылка...** {sent_count + fail_count}/{len(subscribers)}")
-                        except:
-                            pass
 
-                await status_msg.edit_text(f"✅ **Готово!**\n📢 Отправлено: {sent_count}\n❌ Ошибок: {fail_count}")
-                await asyncio.sleep(5)
-                try:
-                    await message.bot.delete_message(message.chat.id, status_msg.message_id)
-                except:
-                    pass
-                sent = await message.answer("✅ Рассылка завершена.", reply_markup=get_admin_kb())
-                await _autodel(sent, 5)
+                total = sent_count + fail_count
+                await message.answer(
+                    f"✅ **Рассылка завершена!**\n\n"
+                    f"📢 Отправлено: **{sent_count}**\n"
+                    f"❌ Ошибок: **{fail_count}**\n"
+                    f"👥 Всего: **{total}** подписчиков",
+                    reply_markup=get_admin_kb()
+                )
                 broadcast_mode.pop(user_id, None)
             return
         else:

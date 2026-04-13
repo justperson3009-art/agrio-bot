@@ -90,8 +90,13 @@ async def handle_user_message(
 
     # Проверка: команда "Каталог" или вопрос про ассортимент
     if check_catalog_commands(user_text):
-        from keyboards.feedback_keyboard import get_feedback_keyboard
-        await message.answer(get_catalog_response(), reply_markup=get_feedback_keyboard())
+        from config import ADMIN_ID
+        if user_id == int(ADMIN_ID or 0):
+            from handlers.admin_handler import get_admin_kb
+            await message.answer(get_catalog_response(), reply_markup=get_admin_kb())
+        else:
+            from keyboards.feedback_keyboard import get_feedback_keyboard
+            await message.answer(get_catalog_response(), reply_markup=get_feedback_keyboard())
         return
 
     # Проверка на prompt injection
