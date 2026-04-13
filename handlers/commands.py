@@ -12,7 +12,8 @@ from responses.command_responses import (
     get_start_response,
     get_help_response,
     get_about_response,
-    get_status_response
+    get_status_response,
+    get_subscribe_prompt
 )
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,8 @@ async def cmd_start(message: Message):
         await message.answer(get_start_response(), reply_markup=kb)
     else:
         await message.answer(get_start_response())
+        # Предложение подписки для новых пользователей
+        await message.answer(get_subscribe_prompt())
 
 
 @router.message(Command("help"))
