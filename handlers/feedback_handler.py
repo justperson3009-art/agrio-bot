@@ -13,6 +13,30 @@ router = Router(name="feedback")
 logger = logging.getLogger(__name__)
 
 
+@router.callback_query(F.data == "subscribe:yes")
+async def handle_subscribe_yes(callback: CallbackQuery):
+    """Пользователь нажал 'Подписаться'"""
+    from feedback_db import add_subscriber
+    user_id = callback.from_user.id
+    add_subscriber(user_id)
+
+    await callback.answer("✅ Вы подписались!", show_alert=False)
+    await callback.message.edit_text(
+        "✅ **Вы подписались на еженедельные советы!**\n\n"
+        "Каждый понедельник в 9:00 — актуальный совет.\n"
+        "Отписаться: /unsubscribe"
+    )
+
+
+@router.callback_query(F.data == "subscribe:no")
+async def handle_subscribe_no(callback: CallbackQuery):
+    """Пользователь нажал 'Не сейчас'"""
+    await callback.answer("Хорошо, может быть позже!", show_alert=False)
+    await callback.message.edit_text(
+        "👍 Хорошо! Если передумаете — напишите /subscribe"
+    )
+
+
 # FSM для запроса комментария при "Не полезно"
 class FeedbackState(StatesGroup):
     waiting_for_comment = State()

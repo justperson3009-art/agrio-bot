@@ -40,8 +40,9 @@ async def cmd_start(message: Message):
         await message.answer(get_start_response(), reply_markup=kb)
     else:
         await message.answer(get_start_response())
-        # Предложение подписки для новых пользователей
-        await message.answer(get_subscribe_prompt())
+        # Предложение подписки с кнопками
+        from keyboards.subscribe_keyboard import get_subscribe_keyboard
+        await message.answer(get_subscribe_prompt(), reply_markup=get_subscribe_keyboard())
 
 
 @router.message(Command("help"))
